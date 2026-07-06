@@ -57,7 +57,38 @@ function Card({ ticket }: { ticket: Ticket }) {
 }
 
 export default async function MatricePage() {
-  const all = await listTickets();
+  let all: Ticket[];
+  try {
+    all = await listTickets();
+  } catch (err) {
+    // Cas typique : base pas encore initialisée (tables absentes) ou connexion
+    // Postgres non configurée. On affiche un message d'aide plutôt qu'un crash.
+    return (
+      <>
+        <Nav />
+        <main className="mx-auto max-w-2xl px-6 py-12">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-6">
+            <h1 className="mb-2 text-lg font-semibold text-amber-900">
+              Base de données pas encore prête
+            </h1>
+            <p className="mb-4 text-sm text-amber-900">
+              La connexion a échoué. Si c'est la première utilisation, il faut
+              créer les tables : ouvre{" "}
+              <a href="/api/migrate" className="font-medium underline">
+                /api/migrate
+              </a>{" "}
+              une fois, puis reviens ici. Si l'erreur persiste, vérifie que la
+              variable <code>POSTGRES_URL</code> (ou <code>DATABASE_URL</code>)
+              est bien configurée sur Vercel, et redéploie.
+            </p>
+            <p className="text-xs text-amber-700">
+              Détail technique : {String((err as Error)?.message ?? err)}
+            </p>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   // On affiche les tickets classés et non rejetés dans leur quadrant.
   const byQuadrant: Record<Quadrant, Ticket[]> = { q1: [], q2: [], q3: [], q4: [] };

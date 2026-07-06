@@ -1,6 +1,34 @@
 import { sql } from "@vercel/postgres";
 import type { ContexteSemaine, Ticket } from "./types";
 
+// --- Résolution de la chaîne de connexion Postgres ---------------------------
+// `@vercel/postgres` ne lit QUE `POSTGRES_URL`. Or l'intégration Neon (via le
+// Marketplace Vercel, qui a remplacé « Vercel Postgres ») expose souvent la
+// connexion sous un autre nom : `DATABASE_URL`. On mappe donc les noms usuels
+// vers `POSTGRES_URL`. Le pool de `sql` est créé paresseusement à la première
+// requête : peupler l'env ici (au chargement du module) suffit à ce qu'il le lise.
+//
+// `createPool` exige une chaîne « pooled » (hôte en `-pooler.`) : on la privilégie.
+function resolvePostgresUrl(): string | undefined {
+  const candidates = [
+    process.env.POSTGRES_URL,
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.DATABASE_URL_UNPOOLED,
+    process.env.POSTGRES_URL_NON_POOLING,
+  ].filter((v): v is string => Boolean(v) && v !== "undefined");
+
+  const pooled = candidates.find(
+    (s) => s.includes("-pooler.") || s.includes("localhost"),
+  );
+  return pooled ?? candidates[0];
+}
+
+if (!process.env.POSTGRES_URL) {
+  const resolved = resolvePostgresUrl();
+  if (resolved) process.env.POSTGRES_URL = resolved;
+}
+
 export { sql };
 
 /**
