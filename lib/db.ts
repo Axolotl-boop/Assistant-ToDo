@@ -1,0 +1,73 @@
+import { sql } from "@vercel/postgres";
+import type { ContexteSemaine, Ticket } from "./types";
+
+export { sql };
+
+/**
+ * Crée les deux tables si elles n'existent pas (idempotent).
+ * Appelée par la route `/api/migrate` et le script `scripts/migrate.ts`.
+ */
+export async function runMigrations(): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS tickets (
+      id                serial PRIMARY KEY,
+      titre             text NOT NULL,
+      demandeur_nom     text NOT NULL DEFAULT '',
+      demandeur_type    text NOT NULL,
+      source            text NOT NULL DEFAULT '',
+      deadline          date,
+      deadline_note     text,
+      effort_estime     text NOT NULL DEFAULT '',
+      domaine           text NOT NULL,
+      description       text NOT NULL DEFAULT '',
+      quadrant          text,
+      verdict           text,
+      importance        text,
+      critere           text,
+      urgence           text,
+      argumentaire      text,
+      alerte            text,
+      elements_langage  text,
+      statut_validation text NOT NULL DEFAULT 'propose',
+      created_at        timestamptz NOT NULL DEFAULT now(),
+      updated_at        timestamptz NOT NULL DEFAULT now()
+    );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS contexte_semaine (
+      id                  serial PRIMARY KEY,
+      semaine_du          date NOT NULL,
+      charge_globale      text NOT NULL DEFAULT 'normal',
+      heures_facturables  text NOT NULL DEFAULT '',
+      temps_dispo_interne text NOT NULL DEFAULT '',
+      engagements_fixes   text NOT NULL DEFAULT '',
+      missions_actives    text NOT NULL DEFAULT '',
+      created_at          timestamptz NOT NULL DEFAULT now()
+    );
+  `;
+}
+
+/**
+ * Récupère le contexte de semaine le plus récent (Couche 3 dynamique).
+ */
+export async function getContexteCourant(): Promise<ContexteSemaine | null> {
+  const { rows } = await sql<ContexteSemaine>`
+    SELECT * FROM contexte_semaine
+    ORDER BY semaine_du DESC, id DESC
+    LIMIT 1;
+  `;
+  return rows[0] ?? null;
+}
+
+export async function listTickets(): Promise<Ticket[]> {
+  const { rows } = await sql<Ticket>`
+    SELECT * FROM tickets ORDER BY created_at DESC, id DESC;
+  `;
+  return rows;
+}
+
+export async function getTicket(id: number): Promise<Ticket | null> {
+  const { rows } = await sql<Ticket>`SELECT * FROM tickets WHERE id = ${id};`;
+  return rows[0] ?? null;
+}
